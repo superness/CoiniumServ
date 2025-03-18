@@ -5,18 +5,17 @@
 		"host": "127.0.0.1",
 		"port": 5555,
 		"username": "rpcusername",
-		"password": "rpcuserpw"
+		"password": "rpcuserpassword"
 	},
 	"meta": {
         "motd": "Welcome to superaxepool, enjoy your stay! - http://www.superaxepool.com/",
         "txMessage": "http://www.superaxepool.com/"
      },
 	 "wallet" : {
-        "address":  "NVLkvEhdiRirRjYuXD74VbiEGBMGKQq7KU",
-		"other": "NSpJ9iTDRqdonf5YcwNmbHPE6U9iFeqT33"
+        "address":  "NODE-WALLET-AADRESS"
     },
 	"rewards":  [
-        {"NXxVU2m4XQav8EJZ3zXCC4KnxJphW15ShQ": 100} 
+        {"PAYOUT-ADDRESS": 100} 
     ],
 	"banning": {
         "enabled": false,
@@ -36,7 +35,7 @@
     },
     "job":  {
         "blockRefreshInterval": 240,
-        "rebroadcastTimeout": 240
+        "rebroadcastTimeout": 30
     },
 	"stratum": {
 		"enabled": true,
@@ -58,8 +57,8 @@
 		    "mysql": {
 			    "host": "127.0.0.1",
 			    "port": 3306,
-			    "user": "super",
-			    "password": "sqlTrooper123!",
+			    "user": "dbuser",
+			    "password": "databaseuserpassword",
                 "database": "dempooldatabase"
 		    }
         },

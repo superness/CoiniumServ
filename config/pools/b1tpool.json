@@ -1,6 +1,6 @@
 {
-	"enabled": true,
-	"coin": "stronghands.json",
+	"enabled": false,
+	"coin": "b1t.json",
 	"daemon": {
 		"host": "127.0.0.1",
 		"port": 5555,
@@ -8,14 +8,14 @@
 		"password": "rpcuserpassword"
 	},
 	"meta": {
-        "motd": "Welcome to bit2pool, enjoy your stay! - http://www.bit2pool.com/",
-        "txMessage": "http://www.bit2pool.com/"
+        "motd": "Welcome to CoiniumServ, enjoy your stay! - http://www.coiniumserv.com/",
+        "txMessage": "http://www.coiniumserv.com/"
      },
 	 "wallet" : {
-        "address":  "SPHWnknyhy7s3iNag9ov1Ty1xGrrsU7FUD"
+        "address":  "NODE-WALLET-AADRESS"
     },
 	"rewards":  [
-        {"Se2h6GmD311d3nNENykTjHHfnyxxPgFDk6": 100} 
+        {"PAYOUT-ADDRESS": 100} 
     ],
 	"banning": {
         "enabled": false,
@@ -25,7 +25,7 @@
         "purgeInterval": 300
     },
 	"payments": {
-		"enabled": false,
+		"enabled": true,
         "interval": 1800,
 		"minimum": 0.01
 	},
@@ -34,32 +34,38 @@
         "timeout": 300
     },
     "job":  {
-        "blockRefreshInterval": 600,
+        "blockRefreshInterval": 30,
         "rebroadcastTimeout": 30        
     },
 	"stratum": {
 		"enabled": true,
 		"bind": "0.0.0.0",
-		"port": 3344,
-		"diff": 16,
+		"port": 3333,
+		"diff": 1024,
         "vardiff": {
             "enabled": true,
-            "minDiff": 16,
-            "maxDiff": 16384,
+            "minDiff": 512,
+            "maxDiff": 65536,
             "targetTime": 15,
             "retargetTime": 90,
             "variancePercent": 25
         }
-	},	
+	},
 	"storage": {
         "hybrid": {
-            "enabled": true,
+            "enabled": false,
+		    "redis": {
+			    "host": "127.0.0.1",
+			    "port": 6379,
+                "password": "",
+                "databaseId": 0
+		    },
 		    "mysql": {
 			    "host": "127.0.0.1",
 			    "port": 3306,
 			    "user": "dbuser",
 			    "password": "databaseuserpassword",
-                "database": "shndpooldatabase"
+                "database": "b1tpooldatabase"
 		    }
         },
         "mpos": {

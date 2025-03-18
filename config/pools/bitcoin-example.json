@@ -3,22 +3,22 @@
 	"coin": "bitcoin.json",
 	"daemon": {
 		"host": "127.0.0.1",
-		"port": 8332,
+		"port": 5555,
 		"username": "rpcusername",
-		"password": "password"
+		"password": "rpcuserpassword"
 	},
 	"meta": {
         "motd": "Welcome to CoiniumServ, enjoy your stay! - http://www.coiniumserv.com/",
         "txMessage": "http://www.coiniumserv.com/"
      },
 	 "wallet" : {
-        "address":  "pool_wallet_address_here"
+        "address":  "NODE-WALLET-AADRESS"
     },
 	"rewards":  [
-        {"pool_Operators_wallet_here_for_receiving_pool_fees": 1} 
+        {"PAYOUT-ADDRESS": 100} 
     ],
 	"banning": {
-        "enabled": true,
+        "enabled": false,
         "duration": 600,
         "invalidPercent": 50,
         "checkThreshold": 100,
@@ -34,8 +34,8 @@
         "timeout": 300
     },
     "job":  {
-        "blockRefreshInterval": 500,
-        "rebroadcastTimeout": 180        
+        "blockRefreshInterval": 30,
+        "rebroadcastTimeout": 30        
     },
 	"stratum": {
 		"enabled": true,
