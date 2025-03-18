@@ -40,7 +40,7 @@ namespace CoiniumServ.Utils.Extensions
         /// <returns></returns>
         public static byte[] HexToByteArray(this string str)
         {
-            str = str.Replace(" ", String.Empty);
+            str = str?.Replace(" ", String.Empty) ?? string.Empty;
 
             var res = new byte[str.Length / 2];
             for (int i = 0; i < res.Length; ++i)
