@@ -2554,6 +2554,16 @@ namespace CoiniumServ.Utils.Numerics
             return (int)hash;
         }
 
+        public uint GetUHashCode()
+        {
+            uint hash = (uint)(sign * 0x01010101u);
+            int len = data != null ? data.Length : 0;
+
+            for (int i = 0; i < len; ++i)
+                hash ^= data[i];
+            return hash;
+        }
+
         public static BigInteger Add(BigInteger left, BigInteger right)
         {
             return left + right;

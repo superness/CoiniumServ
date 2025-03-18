@@ -56,6 +56,15 @@ namespace CoiniumServ.Utils.Extensions
 
         public static byte[] Append(this byte[] a, byte[] b)
         {
+            if(b == null)
+            {
+                return a;
+            }
+            else if(a == null)
+            {
+                return b;
+            }
+
             var result = new byte[a.Length + b.Length];
 
             a.CopyTo(result, 0);

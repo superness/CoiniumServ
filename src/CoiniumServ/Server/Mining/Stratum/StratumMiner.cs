@@ -253,14 +253,14 @@ namespace CoiniumServ.Server.Mining.Stratum
         /// </summary>
         public void SendMessage(string message)
         {
-            var notification = new JsonRequest
-            {
-                Id = null,
-                Method = "client.show_message",
-                Params = new List<object> { message }
-            };
+            //var notification = new JsonRequest
+            //{
+            //    Id = null,
+            //    Method = "client.show_message",
+            //    Params = new List<object> { message }
+            //};
 
-            Send(notification);
+            //Send(notification);
         }
 
         /// <summary>

@@ -28,9 +28,11 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using AustinHarris.JsonRpc;
+using CoiniumServ.Algorithms;
 using CoiniumServ.Daemon;
 using CoiniumServ.Daemon.Exceptions;
 using CoiniumServ.Jobs.Tracker;
@@ -40,6 +42,7 @@ using CoiniumServ.Server.Mining.Getwork;
 using CoiniumServ.Server.Mining.Stratum;
 using CoiniumServ.Server.Mining.Stratum.Errors;
 using CoiniumServ.Utils.Extensions;
+using Newtonsoft.Json;
 using Serilog;
 
 namespace CoiniumServ.Shares
@@ -89,21 +92,23 @@ namespace CoiniumServ.Shares
         /// <param name="nTimeString">The n time string.</param>
         /// <param name="nonceString">The nonce string.</param>
         /// <returns></returns>
-        public IShare ProcessShare(IStratumMiner miner, string jobId, string extraNonce2, string nTimeString, string nonceString)
+        public IShare ProcessShare(IStratumMiner miner, string jobId, string extraNonce2, string nTimeString, string nonceString, string version)
         {
             // check if the job exists
             var id = Convert.ToUInt64(jobId, 16);
             var job = _jobTracker.Get(id);
 
             // create the share
-            var share = new Share(miner, id, job, extraNonce2, nTimeString, nonceString);
+            var share = new Share(miner, id, job, extraNonce2, nTimeString, nonceString, version);
+
+            //_logger.Information($"process share: {job.Height} {share.MerkleRoot?.ToHexString() ?? "??"} {share.CoinbaseHash?.Bytes?.ToHexString() ?? "??"} {JsonConvert.SerializeObject(share.Job.BlockTemplate.Transactions)}");
 
             if (share.IsValid)
                 HandleValidShare(share);
             else
                 HandleInvalidShare(share);
 
-            OnShareSubmitted(new ShareEventArgs(miner));  // notify the listeners about the share.
+            OnShareSubmitted(new ShareEventArgs(miner, share));  // notify the listeners about the share.
 
             return share;
         }
@@ -112,24 +117,43 @@ namespace CoiniumServ.Shares
         {
             throw new NotImplementedException();
         }
+        static string GenerateProgressBar(double percentage, int barLength = 20)
+        {
+            int filledLength = (int)(percentage * barLength);
+            string bar = new string('█', Math.Min(barLength, filledLength)) + new string('-', Math.Max(0, barLength - filledLength));
+            return bar;
+        }
+
 
         private void HandleValidShare(IShare share)
         {
-            var miner = (IStratumMiner) share.Miner;
+            var miner = (IStratumMiner)share.Miner;
             miner.ValidShareCount++;
 
             _storageLayer.AddShare(share); // commit the share.
-            _logger.Debug("Share accepted at {0:0.00}/{1} by miner {2:l}", share.Difficulty, miner.Difficulty, miner.Username);
+            var targetDiff = Math.Max(1, (double)(AlgorithmManager.Diff1 / share.Job.Target));
+            var percentage = share.Difficulty / targetDiff;
+            string progressBar = GenerateProgressBar(percentage, 128);
+            _logger.Information("Share accepted at {0:0.00}/{1} by miner {2:l}", share.Difficulty, miner.Difficulty, miner.Username);
+            _logger.Information(progressBar);
 
             // check if share is a block candidate
             if (!share.IsBlockCandidate)
+            {
+                //_logger.Error($"SHARE NOT BLOCK CANDIDATE '{share.BlockHex?.ToHexString()}'");
                 return;
-            
+            }
+
+            Console.WriteLine($"submiting '{share.MerkleRoot?.ToHexString()}' '{string.Join(",", share.Job.MerkleTree.Hashes.Prepend(share.CoinbaseHash.Bytes).Select(h => h?.ToHexString()))}' '{share.BlockHex?.ToHexString()}'");
+
             // submit block candidate to daemon.
             var accepted = SubmitBlock(share);
 
             if (!accepted) // if block wasn't accepted
+            {
+                _logger.Error($"SHARE NOT ACCEPTED BY SUBMITBLOCK {share.BlockHex?.ToHexString()}");
                 return; // just return as we don't need to notify about it and store it.
+            }
 
             OnBlockFound(EventArgs.Empty); // notify the listeners about the new block.
 
@@ -146,7 +170,7 @@ namespace CoiniumServ.Shares
             switch (share.Error)
             {
                 case ShareError.DuplicateShare:
-                    exception = new DuplicateShareError(share.Nonce);                    
+                    exception = new DuplicateShareError(share.Nonce);
                     break;
                 case ShareError.IncorrectExtraNonce2Size:
                     exception = new OtherError("Incorrect extranonce2 size");
@@ -177,6 +201,7 @@ namespace CoiniumServ.Shares
         {
             // TODO: we should try different submission techniques and probably more then once: https://github.com/ahmedbodi/stratum-mining/blob/master/lib/bitcoin_rpc.py#L65-123
 
+            _logger.Information($"Submitting a block '{share.BlockHex?.ToHexString()}'");
             try
             {
                 if (_poolConfig.Coin.Options.SubmitBlockSupported) // see if submitblock() is available.
@@ -187,7 +212,10 @@ namespace CoiniumServ.Shares
                 var block = _daemonClient.GetBlock(share.BlockHash.ToHexString()); // query the block.
 
                 if (block == null) // make sure the block exists
+                {
+                    _logger.Error($"SubmitBlock block is null from daemon {share.BlockHex}");
                     return false;
+                }
 
                 if (block.Confirmations == -1) // make sure the block is accepted.
                 {
@@ -204,7 +232,8 @@ namespace CoiniumServ.Shares
                     return false;
                 }
 
-                var genTx = _daemonClient.GetTransaction(block.Tx.First()); // get the generation transaction.
+                _logger.Debug($"Asking about generation transaction {genTxHash.ToString()}");
+                var genTx = _daemonClient.GetTransaction(genTxHash); // get the generation transaction.
 
                 // make sure we were able to read the generation transaction
                 if (genTx == null)
@@ -234,7 +263,7 @@ namespace CoiniumServ.Shares
                 // unlike BlockProcessor's detailed exception handling and decision making based on the error,
                 // here in share-manager we only one-shot submissions. If we get an error, basically we just don't care about the rest
                 // and flag the submission as failed.
-                _logger.Debug("We thought a block was found but it was rejected by the coin daemon; [{0:l}] - reason; {1:l}", share.BlockHash.ToHexString(), e.Message);
+                _logger.Debug("We thought a block was found but it was rejected by the coin daemon; [{0:l}] ({1:l}) - reason; {2:l}", share.BlockHash.ToHexString(), share.BlockHex.ToHexString(), e.Message);
                 return false;
             }
         }

@@ -28,6 +28,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 using CoiniumServ.Daemon.Converters;
 using Newtonsoft.Json;
@@ -44,6 +45,9 @@ namespace CoiniumServ.Daemon.Responses
 
         [JsonConverter(typeof(DifficultyConverter))]
         public double Difficulty { get; set; }
+
+        [JsonProperty]
+        public double Difficulty_sha256d { get; set; }
 
         public string Errors { get; set; }
 
@@ -76,8 +80,15 @@ namespace CoiniumServ.Daemon.Responses
 
         [JsonProperty]
         private double NetworkHashps { get; set; }
-    
+
+        [JsonProperty]
+        public Dictionary<string, double> NetworkHashesps { get; set; }
+
+        [JsonProperty]
+        public Dictionary<string, double> Difficulties { get; set; }
+
         [JsonIgnore]
+        
         public double NetworkHashPerSec { get; set; }
 
         [OnDeserialized]

@@ -88,6 +88,7 @@ namespace CoiniumServ.Jobs.Manager
         {
             _extraNonce = new ExtraNonce(instanceId);
             _shareManager.BlockFound += OnBlockFound;
+            _shareManager.ShareSubmitted += OnShareSubmitted;
             _minerManager.MinerAuthenticated += OnMinerAuthenticated;
 
             // create the timers as disabled.
@@ -97,15 +98,47 @@ namespace CoiniumServ.Jobs.Manager
             CreateAndBroadcastNewJob(true); // broadcast a new job initially - which will also setup the timers.
         }
 
+        private void OnShareSubmitted(object sender, EventArgs e)
+        {
+            if(((ShareEventArgs)e).Share.Error == ShareError.LowDifficultyShare)
+            {
+                _logger.Information(@"
+
+   ▄▄▄▄███▄▄▄▄   ▄██   ▄      ▄████████     ███        ▄████████    ▄████████ ▄██   ▄           ▄████████    ▄████████    ▄████████  ▄██████▄     ▄████████ 
+ ▄██▀▀▀███▀▀▀██▄ ███   ██▄   ███    ███ ▀█████████▄   ███    ███   ███    ███ ███   ██▄        ███    ███   ███    ███   ███    ███ ███    ███   ███    ███ 
+ ███   ███   ███ ███▄▄▄███   ███    █▀     ▀███▀▀██   ███    █▀    ███    ███ ███▄▄▄███        ███    █▀    ███    ███   ███    ███ ███    ███   ███    ███ 
+ ███   ███   ███ ▀▀▀▀▀▀███   ███            ███   ▀  ▄███▄▄▄      ▄███▄▄▄▄██▀ ▀▀▀▀▀▀███       ▄███▄▄▄      ▄███▄▄▄▄██▀  ▄███▄▄▄▄██▀ ███    ███  ▄███▄▄▄▄██▀ 
+ ███   ███   ███ ▄██   ███ ▀███████████     ███     ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   ▄██   ███      ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   ▀▀███▀▀▀▀▀   ███    ███ ▀▀███▀▀▀▀▀   
+ ███   ███   ███ ███   ███          ███     ███       ███    █▄  ▀███████████ ███   ███        ███    █▄  ▀███████████ ▀███████████ ███    ███ ▀███████████ 
+ ███   ███   ███ ███   ███    ▄█    ███     ███       ███    ███   ███    ███ ███   ███        ███    ███   ███    ███   ███    ███ ███    ███   ███    ███ 
+  ▀█   ███   █▀   ▀█████▀   ▄████████▀     ▄████▀     ██████████   ███    ███  ▀█████▀         ██████████   ███    ███   ███    ███  ▀██████▀    ███    ███ 
+                                                                   ███    ███                               ███    ███   ███    ███              ███    ███ 
+");
+                CreateAndBroadcastNewJob(false);
+            }
+        }
+
         private void OnBlockFound(object sender, EventArgs e)
         {
             _logger.Verbose("As we have just found a new block, rebroadcasting new work");
+            _logger.Information(@"
+
+   ▄████████  ▄██████▄  ███    █▄  ███▄▄▄▄   ████████▄       ▀█████████▄   ▄█        ▄██████▄   ▄████████    ▄█   ▄█▄ 
+  ███    ███ ███    ███ ███    ███ ███▀▀▀██▄ ███   ▀███        ███    ███ ███       ███    ███ ███    ███   ███ ▄███▀ 
+  ███    █▀  ███    ███ ███    ███ ███   ███ ███    ███        ███    ███ ███       ███    ███ ███    █▀    ███▐██▀   
+ ▄███▄▄▄     ███    ███ ███    ███ ███   ███ ███    ███       ▄███▄▄▄██▀  ███       ███    ███ ███         ▄█████▀    
+▀▀███▀▀▀     ███    ███ ███    ███ ███   ███ ███    ███      ▀▀███▀▀▀██▄  ███       ███    ███ ███        ▀▀█████▄    
+  ███        ███    ███ ███    ███ ███   ███ ███    ███        ███    ██▄ ███       ███    ███ ███    █▄    ███▐██▄   
+  ███        ███    ███ ███    ███ ███   ███ ███   ▄███        ███    ███ ███▌    ▄ ███    ███ ███    ███   ███ ▀███▄ 
+  ███         ▀██████▀  ████████▀   ▀█   █▀  ████████▀       ▄█████████▀  █████▄▄██  ▀██████▀  ████████▀    ███   ▀█▀ 
+                                                                          ▀                                 ▀         
+");
             CreateAndBroadcastNewJob(false);
         }
 
         private void IdleJobTimer(object state)
         {
-            _logger.Verbose("As idle job timer expired, rebroadcasting new work");
+            //_logger.Verbose("As idle job timer expired, rebroadcasting new work");
             CreateAndBroadcastNewJob(true);
         }
 
@@ -114,26 +147,26 @@ namespace CoiniumServ.Jobs.Manager
             if (_jobTracker.Current == null) // make sure we already have succesfully created a previous job.
                 return; // else just skip block-polling until we do so.
 
+            _blockPollerTimer.Change(_poolConfig.Job.BlockRefreshInterval, Timeout.Infinite); // reset the block-poller timer so we can keep polling.
+
             try
             {
-                var blockTemplate = _daemonClient.GetBlockTemplate(_poolConfig.Coin.Options.BlockTemplateModeRequired);
-
+                var miningInfo = _daemonClient.GetMiningInfo();
+                var blockTemplate = _daemonClient.GetBlockTemplate(_poolConfig.Coin.Options.BlockTemplateModeRequired, _poolConfig.Coin.Algorithm);
                 if (blockTemplate.Height == _jobTracker.Current.Height) // if network reports the same block-height with our current job.
                     return; // just return.
                 
-                _logger.Verbose("A new block {0} emerged in network, rebroadcasting new work", blockTemplate.Height);
+                _logger.Verbose("A new block {0} + {1} emerged in network, rebroadcasting new work", blockTemplate.Height, blockTemplate.Transactions.Length);
                 CreateAndBroadcastNewJob(false); // broadcast a new job.
             }
             catch (RpcException) { } // just skip any exceptions caused by the block-pooler queries.
-
-            _blockPollerTimer.Change(_poolConfig.Job.BlockRefreshInterval, Timeout.Infinite); // reset the block-poller timer so we can keep polling.
         }
 
         private void CreateAndBroadcastNewJob(bool initiatedByTimer)
         {
             IJob job = null;
 
-            for (var i = 0; i < 3; i++) // try creating a new job 5 times at least.
+            for (var i = 0; i < 5; i++) // try creating a new job 5 times at least.
             {
                 job = GetNewJob(); // create a new job.
 
@@ -161,7 +194,7 @@ namespace CoiniumServ.Jobs.Manager
         {
             try
             {
-                var blockTemplate = _daemonClient.GetBlockTemplate(_poolConfig.Coin.Options.BlockTemplateModeRequired);
+                var blockTemplate = _daemonClient.GetBlockTemplate(_poolConfig.Coin.Options.BlockTemplateModeRequired, _poolConfig.Coin.Algorithm);
 
                 // TODO: convert generation transaction to ioc & DI based.
                 var generationTransaction = new GenerationTransaction(ExtraNonce, _daemonClient, blockTemplate, _poolConfig);
@@ -177,9 +210,15 @@ namespace CoiniumServ.Jobs.Manager
 
                 return job;
             }
-            catch (RpcException rpcException)
+            catch (Exception exception)
             {
-                _logger.Error("New job creation failed: {0:l}", rpcException.Message);
+                _logger.Error("New job creation failed: {0:l} {1}", exception.Message, exception.StackTrace);
+                exception = exception.InnerException;
+                while (exception != null)
+                {
+                    _logger.Error("                     : {0:l} {1}", exception.Message, exception.StackTrace);
+                    exception = exception.InnerException;
+                }
                 return null;
             }
         }
@@ -226,6 +265,7 @@ namespace CoiniumServ.Jobs.Manager
             if (!stratumMiner.Subscribed)
                 return false;
 
+            
             stratumMiner.SendJob(job);
 
             return true;

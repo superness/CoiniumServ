@@ -252,12 +252,21 @@ namespace CoiniumServ.Blocks
             try
             {
                 _poolAccount = !_poolConfig.Coin.Options.UseDefaultAccount // if UseDefaultAccount is not set
-                    ? _daemonClient.GetAccount(_poolConfig.Wallet.Adress) // find the account of the our pool address.
+                    ? _daemonClient.GetAddressInfo(_poolConfig.Wallet.Adress).Address // find the account of the our pool address.
                     : ""; // use the default account.
             }
-            catch (RpcException e)
+            catch (RpcException)
             {
-                _logger.Error("Error getting account for pool central wallet address: {0:l} - {1:l}", _poolConfig.Wallet.Adress, e.Message);
+                try
+                {
+                    _poolAccount = !_poolConfig.Coin.Options.UseDefaultAccount // if UseDefaultAccount is not set
+                        ? _daemonClient.GetAccount(_poolConfig.Wallet.Adress) // find the account of the our pool address.
+                        : ""; // use the default account.
+                }
+                catch (RpcException e)
+                {
+                    _logger.Error("Error getting account for pool central wallet address: {0:l} - {1:l}", _poolConfig.Wallet.Adress, e.Message);
+                }
             }
         }
     }

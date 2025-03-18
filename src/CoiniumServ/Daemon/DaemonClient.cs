@@ -253,7 +253,7 @@ namespace CoiniumServ.Daemon
         /// https://github.com/bitcoin/bips/blob/master/bip-0022.mediawiki
         /// https://en.bitcoin.it/wiki/Getblocktemplate
         /// </summary>
-        public BlockTemplate GetBlockTemplate(bool modeRequired = false)
+        public BlockTemplate GetBlockTemplate(bool modeRequired = false, string algo = null)
         {
             var data = new Dictionary<string, object>();
 
@@ -261,14 +261,34 @@ namespace CoiniumServ.Daemon
             {
                 // bitcoin variants can accept capabilities: https://github.com/bitcoin/bitcoin/blob/7388b74cd2c5e3b71e991d26953c89c059ba6f2f/src/rpcmining.cpp#L298            
                 data.Add("capabilities", new List<string> { "coinbasetxn", "workid", "coinbase/append" });
+                data.Add("rules", new List<string> { "segwit" });
             }
             else
             {
                 // peercoin variants instead require mode: https://github.com/Peerunity/Peerunity/blob/master/src/bitcoinrpc.cpp#L2206
                 data.Add("mode", "template");
+                data.Add("rules", new List<string> { "segwit" });
+            }
+            //if(algo != null)
+            //{
+            //    data.Add("powalgo", algo);
+            //}
+
+            var paramsList = new List<object>();
+            paramsList.Add(data);
+            if(algo != null)
+            {
+                paramsList.Add(algo);
             }
 
-            return MakeRequest<BlockTemplate>("getblocktemplate", data);
+            try
+            {
+                return MakeRequest<BlockTemplate>("getblocktemplate", paramsList.ToArray());
+            }
+            catch
+            {
+                return MakeRequest<BlockTemplate>("getblocktemplate", data);
+            }
         }
 
         /// <summary>

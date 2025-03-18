@@ -28,6 +28,8 @@
 #endregion
 
 using System;
+using System.Linq;
+using System.Security.Cryptography;
 using CoiniumServ.Algorithms;
 using CoiniumServ.Coin.Coinbase;
 using CoiniumServ.Cryptology;
@@ -38,6 +40,7 @@ using CoiniumServ.Server.Mining.Stratum;
 using CoiniumServ.Utils.Extensions;
 using CoiniumServ.Utils.Helpers;
 using CoiniumServ.Utils.Numerics;
+using Nancy.Session;
 
 namespace CoiniumServ.Shares
 {
@@ -68,7 +71,7 @@ namespace CoiniumServ.Shares
         public byte[] BlockHex { get; private set; }
         public byte[] BlockHash { get; private set; }
 
-        public Share(IStratumMiner miner, UInt64 jobId, IJob job, string extraNonce2, string nTimeString, string nonceString)
+        public Share(IStratumMiner miner, UInt64 jobId, IJob job, string extraNonce2, string nTimeString, string nonceString, string version)
         {
             Miner = miner;
             JobId = jobId;
@@ -84,13 +87,13 @@ namespace CoiniumServ.Shares
             }
 
             // check size of miner supplied extraNonce2
-            if (extraNonce2.Length/2 != ExtraNonce.ExpectedExtraNonce2Size)
+            if (extraNonce2.Length / 2 != ExtraNonce.ExpectedExtraNonce2Size)
             {
                 Error = ShareError.IncorrectExtraNonce2Size;
                 return;
             }
             ExtraNonce2 = Convert.ToUInt32(extraNonce2, 16); // set extraNonce2 for the share.
-            
+
             // check size of miner supplied nTime.
             if (nTimeString.Length != 8)
             {
@@ -98,7 +101,7 @@ namespace CoiniumServ.Shares
                 return;
             }
             NTime = Convert.ToUInt32(nTimeString, 16); // read ntime for the share
-            
+
             // make sure NTime is within range.
             if (NTime < job.BlockTemplate.CurTime || NTime > submitTime + 7200)
             {
@@ -119,21 +122,23 @@ namespace CoiniumServ.Shares
             ExtraNonce1 = miner.ExtraNonce; // extra nonce1 assigned to miner.
 
             // check for duplicate shares.
-            if (!Job.RegisterShare(this)) // try to register share with the job and see if it's duplicated or not.
-            {
-                Error = ShareError.DuplicateShare;
-                return;
-            }
+            var isDupe = Job.RegisterShare(this);
+            //if (!Job.RegisterShare(this)) // try to register share with the job and see if it's duplicated or not.
+            //{
+            //    Error = ShareError.DuplicateShare;
+            //    return;
+            //}
+
 
             // construct the coinbase.
-            CoinbaseBuffer = Serializers.SerializeCoinbase(Job, ExtraNonce1, ExtraNonce2); 
+            CoinbaseBuffer = Serializers.SerializeCoinbase(Job, ExtraNonce1, ExtraNonce2);
             CoinbaseHash = Coin.Coinbase.Utils.HashCoinbase(CoinbaseBuffer);
 
             // create the merkle root.
             MerkleRoot = Job.MerkleTree.WithFirst(CoinbaseHash).ReverseBuffer();
 
             // create the block headers
-            HeaderBuffer = Serializers.SerializeHeader(Job, MerkleRoot, NTime, Nonce);
+            HeaderBuffer = Serializers.SerializeHeader(Job, MerkleRoot, NTime, Nonce, Convert.ToUInt32(version, 16));
             HeaderHash = Job.HashAlgorithm.Hash(HeaderBuffer);
             HeaderValue = new BigInteger(HeaderHash);
 
@@ -143,20 +148,38 @@ namespace CoiniumServ.Shares
             // calculate the block difficulty
             BlockDiffAdjusted = Job.Difficulty * Job.HashAlgorithm.Multiplier;
 
+            if (MerkleRoot == null || CoinbaseHash == null)
+            {
+                Error = ShareError.LowDifficultyShare;
+            }
+
+            if(Difficulty < 1)
+            {
+                IsBlockCandidate = false;
+                Error = ShareError.LowDifficultyShare;
+            }
+
             // check if block candicate
+            BlockHex = Serializers.SerializeBlock(Job, HeaderBuffer, CoinbaseBuffer, miner.Pool.Config.Coin.Options.IsProofOfStakeHybrid);
+            BlockHash = HeaderBuffer.DoubleDigest().ReverseBuffer();
             if (Job.Target >= HeaderValue)
             {
                 IsBlockCandidate = true;
-                BlockHex = Serializers.SerializeBlock(Job, HeaderBuffer, CoinbaseBuffer, miner.Pool.Config.Coin.Options.IsProofOfStakeHybrid);
-                BlockHash = HeaderBuffer.DoubleDigest().ReverseBuffer();
             }
             else
             {
                 IsBlockCandidate = false;
-                BlockHash = HeaderBuffer.DoubleDigest().ReverseBuffer();
+                try
+                {
+                    BlockHash = HeaderBuffer.DoubleDigest().ReverseBuffer();
+                } 
+                catch(CryptographicException)
+                {
+                    return;
+                }
 
                 // Check if share difficulty reaches miner difficulty.
-                var lowDifficulty = Difficulty/miner.Difficulty < 0.99; // share difficulty should be equal or more then miner's target difficulty.
+                var lowDifficulty = Difficulty / miner.Difficulty < 0.99; // share difficulty should be equal or more then miner's target difficulty.
 
                 if (!lowDifficulty) // if share difficulty is high enough to match miner's current difficulty.
                     return; // just accept the share.
