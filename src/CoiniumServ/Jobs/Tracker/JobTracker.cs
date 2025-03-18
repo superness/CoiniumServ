@@ -28,6 +28,7 @@
 #endregion
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -39,7 +40,7 @@ namespace CoiniumServ.Jobs.Tracker
 {
     public class JobTracker:IJobTracker
     {
-        private Dictionary<UInt64, IJob> _jobs;
+        private ConcurrentDictionary<UInt64, IJob> _jobs;
 
         private readonly Timer _cleanupTimer; // timer for cleaning old jobs.
 
@@ -52,7 +53,7 @@ namespace CoiniumServ.Jobs.Tracker
 
         public JobTracker(IPoolConfig poolConfig)
         {
-            _jobs = new Dictionary<UInt64, IJob>();
+            _jobs = new ConcurrentDictionary<UInt64, IJob>();
             _logger = Log.ForContext<JobTracker>().ForContext("Component", poolConfig.Coin.Name);
 
             _cleanupFrequency = MinimumJobBacklog*poolConfig.Job.RebroadcastTimeout; // calculate the cleanup frequency = number of jobs in backlog * rebroad-timeout
@@ -67,27 +68,39 @@ namespace CoiniumServ.Jobs.Tracker
 
         public void Add(IJob job)
         {
-            _jobs.Add(job.Id, job);
+            if (!_jobs.TryAdd(job.Id, job))
+            {
+                throw new Exception("no add");
+            }
             Current = job;
         }
 
         private void CleanUp(object state)
         {
-            var startingCount = _jobs.Count;
+            try
+            {
+                var startingCount = _jobs.Count;
 
-            // calculate the cleanup delta time - jobs created before this will be cleaned up.
-            var delta = TimeHelpers.NowInUnixTimestamp() - _cleanupFrequency;
+                // calculate the cleanup delta time - jobs created before this will be cleaned up.
+                var delta = TimeHelpers.NowInUnixTimestamp() - _cleanupFrequency;
 
-            // find expired jobs that were created before our calcualted delta time.
-            _jobs = _jobs.Where(j => j.Value.CreationTime >= delta || j.Value == Current)
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+                // find expired jobs that were created before our calcualted delta time.
+                _jobs = new ConcurrentDictionary<ulong, IJob>(_jobs.Where(j => j.Value != null && (j.Value.CreationTime >= delta || j.Value == Current))
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
 
-            var cleanedCount = startingCount - _jobs.Count;
+                var cleanedCount = startingCount - _jobs.Count;
 
-            if(cleanedCount > 0)
-                _logger.Debug("Cleaned-up {0} expired jobs", cleanedCount);
+                if (cleanedCount > 0)
+                    _logger.Debug("Cleaned-up {0} expired jobs", cleanedCount);
+            }
+            catch
+            {
 
-            _cleanupTimer.Change(_cleanupFrequency * 1000, Timeout.Infinite); // reset the cleanup timer.
+            }
+            finally
+            {
+                _cleanupTimer.Change(_cleanupFrequency * 1000, Timeout.Infinite); // reset the cleanup timer.
+            }
         }
     }
 }
