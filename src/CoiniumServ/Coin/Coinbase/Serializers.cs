@@ -28,7 +28,9 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using CoiniumServ.Jobs;
 using CoiniumServ.Utils.Extensions;
@@ -39,6 +41,8 @@ namespace CoiniumServ.Coin.Coinbase
 {
     public static class Serializers
     {
+        private static UInt32 VersionMask = Convert.ToUInt32("1fffe000", 16);
+
         /// <summary>
         /// Block data structure.
         /// </summary>
@@ -88,7 +92,7 @@ namespace CoiniumServ.Coin.Coinbase
         /// <param name="nTime"></param>
         /// <param name="nonce"></param>
         /// <returns></returns>
-        public static byte[] SerializeHeader(IJob job, byte[] merkleRoot, UInt32 nTime, UInt32 nonce)
+        public static byte[] SerializeHeader(IJob job, byte[] merkleRoot, UInt32 nTime, UInt32 nonce, UInt32 version)
         {
             byte[] result;
 
@@ -99,7 +103,8 @@ namespace CoiniumServ.Coin.Coinbase
                 stream.WriteValueU32(nTime.BigEndian());
                 stream.WriteBytes(merkleRoot);
                 stream.WriteBytes(job.PreviousBlockHash.HexToByteArray());
-                stream.WriteValueU32(job.BlockTemplate.Version.BigEndian());
+                var versionUse = (job.BlockTemplate.Version & ~VersionMask | version & VersionMask).BigEndian();
+                stream.WriteValueU32(versionUse);
 
                 result = stream.ToArray();
                 result = result.ReverseBytes();
@@ -170,39 +175,91 @@ namespace CoiniumServ.Coin.Coinbase
             return result;
         }
 
-        /// <summary>
-        /// Used to format height and date when putting into script signature:
-        /// </summary>
-        /// <remarks>
-        /// Used to format height and date when putting into script signature: https://en.bitcoin.it/wiki/Script
-        /// </remarks>
-        /// <specification>https://github.com/bitcoin/bips/blob/master/bip-0034.mediawiki#specification</specification>
-        /// <param name="value"></param>
-        /// <returns>Serialized CScript</returns>
-        /// <example>
-        /// python: http://runnable.com/U3Hb26U1918Zx0NR/bitcoin-coinbase-serialize-number-python
-        /// nodejs: http://runnable.com/U3HgCVY2RIAjrw9I/bitcoin-coinbase-serialize-number-nodejs-for-node-js
-        /// </example>
         public static byte[] SerializeNumber(int value)
         {
-
-            if (value >= 1 && value <= 16)
-                return new byte[] { 0x01, (byte)value };
-
-            var buffer = new byte[9];
-            byte lenght = 1;
-
-            while (value > 127)
+            if (value == 0)
             {
-                buffer[lenght++] = (byte)(value & 0xff);
-                value >>= 8;
+                return new byte[] { 0x00 }; // OP_0
+            }
+            if (value >= 1 && value <= 16)
+            {
+                return new byte[] { (byte)(0x50 + value) }; // OP_1 through OP_16 (0x51 to 0x60)
             }
 
-            buffer[0] = lenght;
-            buffer[lenght++] = (byte)value;
 
-            return buffer.Slice(0, lenght);
+
+            if (value == 0)
+                return new byte[0];
+
+            List<byte> result = new List<byte>();
+            bool isNegative = value < 0;
+            ulong absValue = isNegative ? (ulong)(-value) : (ulong)value;
+
+            while (absValue != 0)
+            {
+                result.Add((byte)(absValue & 0xff));
+                absValue >>= 8;
+            }
+
+            // Check if the most significant byte is 0x80 or higher
+            if ((result.Last() & 0x80) != 0)
+                result.Add(isNegative ? (byte)0x80 : (byte)0x00);
+            else if (isNegative)
+                result[result.Count - 1] |= 0x80;
+
+            var modResult = AppendData(result.ToArray());
+
+            return modResult.ToArray();
         }
+
+        public static List<byte> AppendData(byte[] b)
+        {
+            List<byte> result = new List<byte>();
+
+            if (b.Length < 0x4c) // OP_PUSHDATA1
+            {
+                result.Add((byte)b.Length);
+            }
+            else if (b.Length <= 0xff)
+            {
+                result.Add(0x4c); // OP_PUSHDATA1
+                result.Add((byte)b.Length);
+            }
+            else if (b.Length <= 0xffff)
+            {
+                result.Add(0x4d); // OP_PUSHDATA2
+                result.AddRange(BitConverter.GetBytes((ushort)b.Length));
+                if (BitConverter.IsLittleEndian == false)
+                {
+                    // Ensure little-endian byte order
+                    int n = result.Count;
+                    byte temp = result[n - 1];
+                    result[n - 1] = result[n - 2];
+                    result[n - 2] = temp;
+                }
+            }
+            else
+            {
+                result.Add(0x4e); // OP_PUSHDATA4
+                result.AddRange(BitConverter.GetBytes((uint)b.Length));
+                if (BitConverter.IsLittleEndian == false)
+                {
+                    // Ensure little-endian byte order
+                    int n = result.Count;
+                    byte temp = result[n - 1];
+                    result[n - 1] = result[n - 4];
+                    result[n - 4] = temp;
+                    temp = result[n - 2];
+                    result[n - 2] = result[n - 3];
+                    result[n - 3] = temp;
+                }
+            }
+
+            result.AddRange(b);
+
+            return result;
+        }
+
 
         /// <summary>
         /// Used to format height and date when putting into script signature:

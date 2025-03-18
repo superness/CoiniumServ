@@ -36,7 +36,6 @@ using Org.BouncyCastle.Math;
 
 namespace CoiniumServ.Coin.Address
 {
-
     /// <summary>
     /// Base58 encoder & decoder
     /// </summary>
