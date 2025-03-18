@@ -236,7 +236,7 @@ namespace CoiniumServ.Tests.Shares
             var id = Convert.ToUInt64(jobId, 16);
             var job = _jobTracker.Get(id);
 
-            var share = new Share(_miner, id, job, extraNonce2, nTime, nonce);
+            var share = new Share(_miner, id, job, extraNonce2, nTime, nonce, string.Empty);
 
             // test miner provided nonce and ntime
             share.NTime.Should().Equal((UInt32)0x53aaa331);
@@ -324,7 +324,7 @@ namespace CoiniumServ.Tests.Shares
             var id = Convert.ToUInt64(jobId, 16);
             var job = _jobTracker.Get(id);
 
-            var share = new Share(_miner, id, job, extraNonce2, nTime, nonce);
+            var share = new Share(_miner, id, job, extraNonce2, nTime, nonce, string.Empty);
 
             // test miner provided nonce and ntime
             share.NTime.Should().Equal((UInt32)0x53aaa331);

@@ -41,6 +41,7 @@ using CoiniumServ.Pools;
 using CoiniumServ.Transactions;
 using CoiniumServ.Transactions.Script;
 using CoiniumServ.Utils.Extensions;
+using Nancy.Session;
 using Newtonsoft.Json;
 using NSubstitute;
 using Should.Fluent;
@@ -220,7 +221,7 @@ namespace CoiniumServ.Tests.Coin.Coinbase
             var merkleRoot = _job.MerkleTree.WithFirst(coinbaseHash).ReverseBuffer();
 
             // create the header
-            var header = Serializers.SerializeHeader(_job, merkleRoot, nTime, nonce);
+            var header = Serializers.SerializeHeader(_job, merkleRoot, nTime, nonce, Convert.ToUInt32(_job.Version, 16));
 
             // test the header.
             header.ToHexString().Should().Equal("0100000062804ac7aa2748b16841fc12ac15721dc5be748c64c6b596b74c56478eb84e1c1732a2242d83c6b1a935eecec4c48e56a10b0977f723456331f6b2ff5efb757831a3aa53f7d4481d00507244");
@@ -242,7 +243,7 @@ namespace CoiniumServ.Tests.Coin.Coinbase
             var merkleRoot = _job.MerkleTree.WithFirst(coinbaseHash).ReverseBuffer();
 
             // create the header
-            var header = Serializers.SerializeHeader(_job, merkleRoot, nTime, nonce);
+            var header = Serializers.SerializeHeader(_job, merkleRoot, nTime, nonce, Convert.ToUInt32(_job.Version, 16));
 
             // create the block hex
             var blockHex = Serializers.SerializeBlock(_job, header, coinbase);
