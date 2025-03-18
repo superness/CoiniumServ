@@ -1,0 +1,16 @@
+{
+    "name": "eMark",
+    "symbol": "DEM",
+    "algorithm": "sha256",
+    "site": "https://www.deutsche-emark.org/index.php?en/",
+    "blockExplorer": {
+        "block": "https://cryptobe.com/block/",
+        "tx": "https://cryptobe.com/tx/",
+        "address": "https://cryptobe.com/address/"
+    },
+    "options": {
+      "isProofOfStakeHybrid": true,
+      "blockTemplateModeRequired": false,
+      "txMessageSupported": true	
+    }
+}
