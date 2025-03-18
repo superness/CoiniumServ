@@ -27,13 +27,51 @@
 // 
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CoiniumServ.Utils.Extensions;
 using CoiniumServ.Utils.Helpers;
+using CoiniumServ.Utils.Numerics;
 
 namespace CoiniumServ.Cryptology.Merkle
 {
+
+    public class MerkleRoot
+    {
+
+        public static string merkle(string[] transactions)
+        {
+            while (true)
+            {
+                if (transactions.Length == 1) return transactions[0];
+                List<string> newHashList = new List<string>();
+                int len = (transactions.Length % 2 != 0) ? transactions.Length - 1 : transactions.Length;
+                for (int i = 0; i < len; i += 2) newHashList.Add(Hash2(transactions[i], transactions[i + 1]));
+                if (len < transactions.Length) newHashList.Add(Hash2(transactions[transactions.Length - 1], transactions[transactions.Length - 1]));
+                transactions = newHashList.ToArray();
+            }
+        }
+
+
+        static string Hash2(string a, string b)
+        {
+            byte[] a1 = Enumerable.Range(0, a.Length / 2).Select(x => Convert.ToByte(a.Substring(x * 2, 2), 16)).ToArray();
+            Array.Reverse(a1);
+            byte[] b1 = Enumerable.Range(0, b.Length / 2).Select(x => Convert.ToByte(b.Substring(x * 2, 2), 16)).ToArray();
+            Array.Reverse(b1);
+            var c = a1.Concat(b1).ToArray();
+            var sha256 = System.Security.Cryptography.SHA256.Create();
+            byte[] firstHash = sha256.ComputeHash(c);
+            byte[] hashOfHash = sha256.ComputeHash(firstHash);
+            Array.Reverse(hashOfHash);
+            return BitConverter.ToString(hashOfHash).Replace("-", "").ToLower();
+        }
+
+    }
+
+
+
     /// <summary>
     /// Merkle tree builder.
     /// </summary>
@@ -51,6 +89,9 @@ namespace CoiniumServ.Cryptology.Merkle
         /// The steps in tree.
         /// </summary>
         public IList<byte[]> Steps { get; private set; }
+
+        private IList<byte[]> _hashes;
+        public IEnumerable<byte[]> Hashes => _hashes.ToArray();
 
         /// <summary>
         /// List of hashes, will be used for calculation of merkle root. 
@@ -72,6 +113,7 @@ namespace CoiniumServ.Cryptology.Merkle
         public MerkleTree(IEnumerable<byte[]> hashList)
         {
             Steps = CalculateSteps(hashList);
+            _hashes = hashList.ToList();
         }       
 
         /// <summary>
@@ -87,13 +129,13 @@ namespace CoiniumServ.Cryptology.Merkle
         {
             var steps = new List<byte[]>();
 
-            var L = new List<byte[]> {null};
+            var L = new List<byte[]>();
             L.AddRange(hashList);
 
             var startL = 2;
             var Ll = L.Count;
 
-            if (Ll > 1)
+            if (Ll > 0)
             {
                 while (true)
                 {
@@ -138,6 +180,12 @@ namespace CoiniumServ.Cryptology.Merkle
 
         public byte[] WithFirst(byte[] first)
         {
+            var withFirst = _hashes.Prepend(first);
+
+            return MerkleTreeCalculator.ComputeMerkleRoot(withFirst.Select(h => new BigInteger(h)).ToList(), out bool mutated).ToByteArray();
+
+            //return MerkleRoot.merkle(withFirst.Select(h => h.ToHexString()).ToArray()).HexToByteArray();
+
             foreach (var step in Steps)
             {
                 first = first.Append(step).DoubleDigest();
@@ -146,4 +194,45 @@ namespace CoiniumServ.Cryptology.Merkle
             return first;
         }
     }
+
+
+    public class MerkleTreeCalculator
+    {
+        public static BigInteger ComputeMerkleRoot(List<BigInteger> hashes, out bool mutated)
+        {
+            mutated = false;
+            while (hashes.Count > 1)
+            {
+                if (hashes.Count % 2 == 1)
+                    hashes.Add(hashes.Last());  // Duplicate the last element if odd number of hashes
+
+                List<BigInteger> newHashes = new List<BigInteger>();
+
+                for (int i = 0; i < hashes.Count; i += 2)
+                {
+                    if (hashes[i] == hashes[i + 1])
+                        mutated = true;
+
+                    BigInteger hashPair = HashTwice(hashes[i], hashes[i + 1]);
+                    newHashes.Add(hashPair);
+                }
+
+                hashes = newHashes;
+            }
+
+            return hashes.Count > 0 ? hashes[0] : BigInteger.Zero;
+        }
+
+        private static BigInteger HashTwice(BigInteger left, BigInteger right)
+        {
+            using (System.Security.Cryptography.SHA256 sha256 = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] input = left.ToByteArray().Concat(right.ToByteArray()).ToArray();
+                byte[] firstHash = sha256.ComputeHash(input);
+                byte[] secondHash = sha256.ComputeHash(firstHash);
+                return new BigInteger(secondHash);
+            }
+        }
+    }
+
 }

@@ -44,6 +44,7 @@ namespace CoiniumServ.Cryptology.Merkle
     /// </example>
     public interface IMerkleTree
     {
+        IEnumerable<byte[]> Hashes { get; }
         IList<byte[]> Steps { get; }
 
         List<string> Branches { get; }
