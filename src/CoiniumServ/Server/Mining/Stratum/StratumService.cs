@@ -29,10 +29,15 @@
 
 using AustinHarris.JsonRpc;
 using CoiniumServ.Jobs;
+using CoiniumServ.Jobs.Manager;
 using CoiniumServ.Pools;
 using CoiniumServ.Server.Mining.Service;
 using CoiniumServ.Server.Mining.Stratum.Responses;
 using CoiniumServ.Shares;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace CoiniumServ.Server.Mining.Stratum
 {
@@ -41,12 +46,14 @@ namespace CoiniumServ.Server.Mining.Stratum
     /// </summary>
     public class StratumService : JsonRpcService, IRpcService
     {
+        private readonly ILogger _logger;
         private readonly IShareManager _shareManager;
 
         public StratumService(IPoolConfig poolConfig, IShareManager shareManager):
             base(poolConfig.Coin.Name)
         {
             _shareManager = shareManager;
+            _logger = Log.ForContext<JobManager>().ForContext("Component", poolConfig.Coin.Name);
         }
 
         /// <summary>
@@ -91,10 +98,46 @@ namespace CoiniumServ.Server.Mining.Stratum
         /// <param name="nTime"> UNIX timestamp (32bit integer, big-endian, hex-encoded), must be >= ntime provided by mining,notify and <= current time'</param>
         /// <param name="nonce"> 32bit integer hex-encoded, big-endian </param>
         [JsonRpcMethod("mining.submit")]
-        public bool SubmitWork(string user, string jobId, string extraNonce2, string nTime, string nonce)
+        public bool SubmitWork(string user, string jobId, string extraNonce2, string nTime, string nonce, string version)
         {
+            _logger.Information($"mining.submit {user}, {jobId}, ${extraNonce2}, ${nTime}, ${nonce}, ${version}");
             var context = (StratumContext)JsonRpcContext.Current().Value;
-            return _shareManager.ProcessShare(context.Miner, jobId, extraNonce2, nTime, nonce).IsValid;
+
+            int tries = 0;
+            while(tries++ < 3)
+            {
+                try
+                {
+                    var share = _shareManager.ProcessShare(context.Miner, jobId, extraNonce2, nTime, nonce, version);
+                    if(share.Error == ShareError.LowDifficultyShare)
+                    {
+
+                    }
+                    return share.IsValid;
+                }
+                catch(Exception ex) when (tries > 0) {
+                    _logger.Information($" >> retry {tries} {ex}");
+                }
+            }
+
+            return false;
+        }
+
+        [JsonRpcMethod("mining.suggest_difficulty")]
+        public bool SuggestDifficulty(int difficulty)
+        {
+            return true;
+        }
+
+        [JsonRpcMethod("mining.configure")]
+        public ConfigureResponse Configure(List<string> versions, object extra)
+        {
+            var response = new ConfigureResponse()
+            {
+                VersionRolling = false,
+                VersionRollMask = "1FFF0000"
+            };
+            return response;
         }
     }
 }

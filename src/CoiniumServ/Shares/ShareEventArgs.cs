@@ -35,10 +35,13 @@ namespace CoiniumServ.Shares
     public class ShareEventArgs:EventArgs
     {
         public IStratumMiner Miner { get; private set; }
+        public IShare Share { get; private set; }
 
-        public ShareEventArgs(IStratumMiner miner)
+        public ShareEventArgs(IStratumMiner miner, IShare share)
         {
             Miner = miner;
+            Share = share;
+
         }
     }
 }
