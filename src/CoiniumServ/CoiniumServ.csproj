@@ -601,10 +601,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\NBitcoin-master\NBitcoin-master\NBitcoin\NBitcoin.csproj">
-      <Project>{2a4044aa-b80f-49db-9a4c-08aeb379bc8f}</Project>
-      <Name>NBitcoin</Name>
-    </ProjectReference>
     <ProjectReference Include="..\JSON-RPC.NET-master\Json-Rpc\AustinHarris.JsonRpc.csproj">
       <Project>{5842B123-C143-4647-9133-C2B8D7DCEAB7}</Project>
       <Name>AustinHarris.JsonRpc</Name>
