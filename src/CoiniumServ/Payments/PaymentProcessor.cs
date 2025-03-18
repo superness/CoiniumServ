@@ -195,11 +195,22 @@ namespace CoiniumServ.Payments
                 if(newWallet == true)
                 {
                     var result = _daemonClient.ValidateAddress(_poolConfig.Wallet.Adress);
-                    var resultnew = _daemonClient.GetAddressInfo(_poolConfig.Wallet.Adress);
-                    
-                    if (result.IsValid && resultnew.IsMine)
+
+                    try
+                    {
+                        var resultnew = _daemonClient.GetAddressInfo(_poolConfig.Wallet.Adress);
+
+                        if (result.IsValid && resultnew.IsMine)
+                            return true;
+                    }
+                    catch
+                    {
+
+                    }
+
+                    if (result.IsValid && result.IsMine)
                         return true;
-                                 
+
                     _logger.Error("Halted as daemon we are connected to does not own the pool address: {0:l}.", _poolConfig.Wallet.Adress);
                     return false;
                 }
@@ -207,7 +218,18 @@ namespace CoiniumServ.Payments
                 {
                     var result = _daemonClient.ValidateAddress(_poolConfig.Wallet.Adress);
 
-                    // make sure the pool central wallet address is valid and belongs to the daemon we are connected to.
+                    try
+                    {
+                        var resultnew = _daemonClient.GetAddressInfo(_poolConfig.Wallet.Adress);
+
+                        if (result.IsValid && resultnew.IsMine)
+                            return true;
+                    }
+                    catch
+                    {
+
+                    }
+
                     if (result.IsValid && result.IsMine)
                         return true;
 
@@ -226,9 +248,16 @@ namespace CoiniumServ.Payments
         {
             try
             {
-                _poolAccount = !_poolConfig.Coin.Options.UseDefaultAccount // if UseDefaultAccount is not set
-                    ? _daemonClient.GetAccount(_poolConfig.Wallet.Adress) // find the account of the our pool address.
-                    : ""; // use the default account.
+                try
+                {
+                    _poolAccount = !_poolConfig.Coin.Options.UseDefaultAccount // if UseDefaultAccount is not set
+                        ? _daemonClient.GetAddressInfo(_poolConfig.Wallet.Adress).Address // find the account of the our pool address.
+                        : ""; // use the default account.
+                }
+                catch
+                {
+                    _poolAccount = _daemonClient.ValidateAddress(_poolConfig.Wallet.Adress).Address;
+                }
                 return true;
             }
             catch (Exception e)

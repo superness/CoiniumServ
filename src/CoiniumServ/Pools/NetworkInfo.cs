@@ -28,6 +28,7 @@
 #endregion
 
 using System;
+using System.Linq;
 using CoiniumServ.Algorithms;
 using CoiniumServ.Daemon;
 using CoiniumServ.Daemon.Errors;
@@ -147,8 +148,16 @@ namespace CoiniumServ.Pools
                 var miningInfo = _daemonClient.GetMiningInfo();
 
                 // read data.
-                Hashrate = miningInfo.NetworkHashPerSec;
-                Difficulty = miningInfo.Difficulty;
+                Hashrate = miningInfo.NetworkHashesps != null ? miningInfo.NetworkHashesps.First(kvp => kvp.Key == _poolConfig.Coin.Algorithm || (_poolConfig.Coin.Algorithm == "sha256" && kvp.Key == "sha256d")).Value
+                                                              : miningInfo.NetworkHashPerSec;
+                Difficulty = miningInfo.Difficulties != null ? miningInfo.Difficulties.First(kvp => kvp.Key == _poolConfig.Coin.Algorithm || (_poolConfig.Coin.Algorithm == "sha256" && kvp.Key == "sha256d")).Value
+                                                              : miningInfo.Difficulty;
+
+                if(miningInfo.Difficulty_sha256d != 0 && _poolConfig.Coin.Algorithm == "sha256")
+                {
+                    Difficulty = miningInfo.Difficulty_sha256d;
+                }
+
                 Round = miningInfo.Blocks + 1;
                 if (!Testnet)
                     Testnet = miningInfo.Testnet;
@@ -164,7 +173,7 @@ namespace CoiniumServ.Pools
 
             try // read getblocktemplate() based data.
             {
-                var blockTemplate = _daemonClient.GetBlockTemplate(_poolConfig.Coin.Options.BlockTemplateModeRequired);
+                var blockTemplate = _daemonClient.GetBlockTemplate(_poolConfig.Coin.Options.BlockTemplateModeRequired, _poolConfig.Coin.Algorithm);
                 Reward = (UInt64)blockTemplate.Coinbasevalue / 100000000; // coinbasevalue is in satoshis, convert it to actual coins.
             }
             catch (RpcException e)

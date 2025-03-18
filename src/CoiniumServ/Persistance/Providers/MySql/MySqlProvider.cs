@@ -56,7 +56,7 @@ namespace CoiniumServ.Persistance.Providers.MySql
         {
             try
             {
-                ConnectionString = string.Format("Server={0};Port={1};Uid={2};Password={3};Database={4};",
+                ConnectionString = string.Format("Server={0};Port={1};Uid={2};Password={3};Database={4};SslMode=REQUIRED",
                     _config.Host, _config.Port, _config.Username, _config.Password, _config.Database);
 
                 using (var connection = new MySqlConnection(ConnectionString))

@@ -104,7 +104,7 @@ namespace CoiniumServ.Pools
             {
                 foreach (var pool in _storage) // recache per-pool stats
                 {
-                    pool.Recache();
+                    pool?.Recache();
                 }
 
                 // cache the json-service response

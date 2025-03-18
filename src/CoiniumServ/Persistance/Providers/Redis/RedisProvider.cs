@@ -35,7 +35,7 @@ namespace CoiniumServ.Persistance.Providers.Redis
 {
     public class RedisProvider : IRedisProvider
     {
-        public bool IsConnected { get { return Client.IsConnected; } }
+        public bool IsConnected { get { return Client?.IsConnected ?? false; } }
 
         public RedisClient Client { get; private set; }
         
