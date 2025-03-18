@@ -182,7 +182,7 @@ namespace CoiniumServ.Cryptology.Merkle
         {
             var withFirst = _hashes.Prepend(first);
 
-            return MerkleTreeCalculator.ComputeMerkleRoot(withFirst.Select(h => new BigInteger(h)).ToList(), out bool mutated).ToByteArray();
+            //return MerkleTreeCalculator.ComputeMerkleRoot(withFirst.Select(h => new BigInteger(h)).ToList(), out bool mutated).ToByteArray();
 
             //return MerkleRoot.merkle(withFirst.Select(h => h.ToHexString()).ToArray()).HexToByteArray();
 
