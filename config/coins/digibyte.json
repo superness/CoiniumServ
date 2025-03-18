@@ -1,7 +1,7 @@
 {
     "name": "Digibyte",
     "symbol": "DGB",
-    "algorithm": "scrypt",
+    "algorithm": "sha256",
     "site": "http://www.digibyte.co/",
     "blockExplorer": {
         "block": "http://insight.dgb.cryptopoolmining.com/block/",

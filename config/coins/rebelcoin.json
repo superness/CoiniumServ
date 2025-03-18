@@ -1,0 +1,14 @@
+{
+    "name": "Rebel Coin",
+    "symbol": "RBL",
+    "algorithm": "sha256",
+    "site": "https://rebelcoin.io/",
+    "blockExplorer": {
+        "block": "https://explorer.rebelcoin.io/"
+    },
+    "options": {
+      "isProofOfStakeHybrid": false,
+      "blockTemplateModeRequired": false,
+      "txMessageSupported": true	
+    }
+}
